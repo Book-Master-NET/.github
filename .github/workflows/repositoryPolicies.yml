@@ -1,0 +1,45 @@
+name: Verificar Nomenclatura de Repositorio
+
+on:
+  create:
+    types: [repository]
+  workflow_dispatch:
+
+jobs:
+  check-repo-name:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'create'
+    steps:
+      - name: Verificar nombre del repositorio
+        id: check-name
+        run: |
+          REPO_NAME="${{ github.repository }}"
+          TEAM_PREFIX_PATTERN="^(team[0-9]+)-"
+          
+          if [[ ! "$REPO_NAME" =~ $TEAM_PREFIX_PATTERN ]]; then
+            echo "::error::El nombre del repositorio debe comenzar con un prefijo de equipo (ej. team1-, team2-)"
+            echo "COMPLIANT=false" >> $GITHUB_ENV
+          else
+            echo "El repositorio cumple con la convención de nomenclatura"
+            echo "COMPLIANT=true" >> $GITHUB_ENV
+          fi
+      
+      - name: Notificar incumplimiento
+        if: env.COMPLIANT == 'false'
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            
+            await github.rest.issues.create({
+              owner: owner,
+              repo: repo,
+              title: '⚠️ Nombre de repositorio no cumple con la convención',
+              body: `Este repositorio no cumple con la convención de nomenclatura establecida.
+              
+              Los nombres de repositorios deben comenzar con el prefijo del equipo correspondiente (ej. team1-, team2-).
+              
+              Por favor, contacta con un administrador para renombrar este repositorio.`
+            });
